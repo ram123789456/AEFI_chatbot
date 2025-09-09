@@ -12,7 +12,7 @@ df = pd.read_excel(EXCEL_FILE)
 app = Flask(__name__)
 
 # WhatsApp API credentials (replace with your values)
-WHATSAPP_TOKEN = "EAARZBFTpWZAZBgBPRX94ekpoZBjHZC4T2ULwVv2eqNDvang5ZCANxS1X0C1r7UZA5LRYOWbA0FpZASXQI0RGZB511HWI0YuwerGs3r5pQUCJLQgNi9TGh6NriRwOocQA0Q4z1xELGs8nrjAboMSje2ISgkMSihIZCLh5HedPtNB44IhaNCjZCTRlOZAb38sSeAiZB20zN4P7ZBybiwf7jPupzWFUr7TR7hUeieHgIkba7EQ3uI9BcigAZDZD"
+WHATSAPP_TOKEN = "EAARZBFTpWZAZBgBPRARPSZBz5hQqk4tIjigiJt7alkwly5qNJbmSlZBqmF4v7YmshfKOIhFFr6X1v6p2ZAdwTyZCvacZANGsxzwKqaUOZAkfeIwbiCbnXZAufMwtSpPf5F6lmpJffzGj4oZA11ihMi3ZCq4uXE0ZAadwp84vIwW8Q44PyrSQnbqv4HO2Y1ZBOnZAlwkHTeHngZDZD"
 WHATSAPP_PHONE_NUMBER_ID = "810686228788481"
 VERIFY_TOKEN = "aefi123"
 
@@ -147,4 +147,5 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
+
 
