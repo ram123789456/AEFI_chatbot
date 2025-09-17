@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 import requests
 
 # --------------------------
-# Load Excel file (ensure it's in your repo root!)
+# Load Excel file
 # --------------------------
 EXCEL_FILE = "AEFI_Training_Sample.xlsx"
 try:
@@ -24,113 +24,80 @@ WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN")
 WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID")
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN")
 
-# Session store (in-memory)
+# Session store
 user_sessions = {}
 
 # --------------------------
 # Helper functions
 # --------------------------
 def send_whatsapp_message(to, message):
-    """Send plain text message via WhatsApp API"""
+    """Send plain text message"""
     url = f"https://graph.facebook.com/v17.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "messaging_product": "whatsapp",
-        "to": to,
-        "text": {"body": message}
-    }
+    headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}", "Content-Type": "application/json"}
+    data = {"messaging_product": "whatsapp", "to": to, "text": {"body": message}}
     response = requests.post(url, headers=headers, data=json.dumps(data))
     print("Send message response:", response.text)
 
-
 def send_button_message(to, body_text, buttons):
-    """Send button-based interactive message"""
+    """Send interactive button message"""
     url = f"https://graph.facebook.com/v17.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
-        "Content-Type": "application/json"
-    }
+    headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}", "Content-Type": "application/json"}
     data = {
         "messaging_product": "whatsapp",
         "to": to,
         "type": "interactive",
-        "interactive": {
-            "type": "button",
-            "body": {"text": body_text},
-            "action": {"buttons": buttons}
-        }
+        "interactive": {"type": "button", "body": {"text": body_text}, "action": {"buttons": buttons}}
     }
     response = requests.post(url, headers=headers, data=json.dumps(data))
     print("Send button response:", response.text)
 
-
 def send_start_prompt(to):
-    """Ask user to start quiz"""
+    """Send start quiz button"""
     send_button_message(
         to,
         "नमस्ते! AEFI प्रशिक्षण बॉट में आपका स्वागत है 🙏\nक्या आप क्विज़ शुरू करना चाहेंगे?",
-        [
-            {"type": "reply", "reply": {"id": "start_quiz", "title": "शुरू करें ✅"}}
-        ]
+        [{"type": "reply", "reply": {"id": "start_quiz", "title": "शुरू करें ✅"}}]
     )
 
-
 def send_question(to, q_index):
-    """Send one question with its options"""
+    """Send question with options"""
     if df.empty:
         send_whatsapp_message(to, "⚠️ प्रश्न डेटा उपलब्ध नहीं है।")
         return
 
     row = df.iloc[q_index]
-    question_text = row["Question"] if "Question" in row and pd.notna(row["Question"]) else None
-    if not question_text:
-        question_text = row[df.columns[0]]  # fallback: first column
+    question_text = row["Question"] if "Question" in row and pd.notna(row["Question"]) else row[df.columns[0]]
+    body_text = f"प्रश्न {q_index+1}: {question_text}"
 
-    body_text = f"प्रश्न {q_index+1}: {question_text}"   
-
-    # Build option buttons
+    # Build buttons
     buttons = []
     for i in range(1, 5):
         col = f"Option {i}"
         if col in row and pd.notna(row[col]):
-            buttons.append({
-                "type": "reply",
-                "reply": {"id": str(i), "title": str(row[col])}
-            })
-
+            buttons.append({"type": "reply", "reply": {"id": str(i), "title": str(row[col])}})
     print("📤 Question sent:", body_text)
-    print("📤 Options:", [btn["reply"]["title"] for btn in buttons])
-    
+    print("📤 Options:", [b["reply"]["title"] for b in buttons])
+
     send_button_message(to, body_text, buttons)
 
 # --------------------------
 # Routes
 # --------------------------
-
 @app.route("/", methods=["GET"])
 def home():
     return "✅ AEFI WhatsApp Bot is running!", 200
 
-
-# Webhook Verification
 @app.route("/webhook", methods=["GET"])
 def verify():
     mode = request.args.get("hub.mode")
     token = request.args.get("hub.verify_token")
     challenge = request.args.get("hub.challenge")
-
     if mode == "subscribe" and token == VERIFY_TOKEN:
-        print("Webhook verified successfully ✅")
+        print("Webhook verified ✅")
         return challenge, 200
     else:
-        print("❌ Webhook verification failed")
         return "Verification failed", 403
 
-
-# Webhook Receiver
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
@@ -138,39 +105,25 @@ def webhook():
     print("Incoming webhook:", json.dumps(data, indent=2, ensure_ascii=False))
 
     try:
+        # Check if message exists
         if "messages" in data.get("entry", [])[0].get("changes", [])[0]["value"]:
             message = data["entry"][0]["changes"][0]["value"]["messages"][0]
             from_number = message["from"]
 
-            # Ensure session exists
+            # Ensure session
             if from_number not in user_sessions:
                 user_sessions[from_number] = {"score": 0, "q_index": None}
 
-            # Handle text messages
+            # Text messages
             if message.get("type") == "text":
                 if user_sessions[from_number]["q_index"] is None:
                     send_start_prompt(from_number)
                     return jsonify({"status": "ok"}), 200
-            
-            # --------------------------
-            # ✅ Handle interactive replies (fixed)
-            # --------------------------
+
+            # Interactive buttons
             if message.get("type") == "interactive":
                 interactive = message["interactive"]
                 interactive_type = interactive.get("type")
-
-                # Case 1: Start button
-                if interactive_type == "button_reply" and interactive["button_reply"]["id"] == "start_quiz":
-                    user_sessions[from_number]["q_index"] = 0
-                    user_sessions[from_number]["score"] = 0
-                    print("📌 Sending first question...")
-                    if df.empty:
-                        send_whatsapp_message(from_number, "⚠️ कोई प्रश्न लोड नहीं हुआ। Excel फ़ाइल देखें।")
-                    else:
-                        send_question(from_number, 0)
-                    return jsonify({"status": "ok"}), 200
-
-                # Case 2: Answer button
                 button_id = None
                 if interactive_type == "button_reply":
                     button_id = interactive["button_reply"]["id"]
@@ -178,9 +131,16 @@ def webhook():
                     button_id = interactive["list_reply"]["id"]
 
                 if not button_id:
-                    print("⚠️ Unknown interactive type:", interactive_type)
                     return jsonify({"status": "ignored"}), 200
 
+                # Start quiz
+                if button_id == "start_quiz":
+                    user_sessions[from_number]["q_index"] = 0
+                    user_sessions[from_number]["score"] = 0
+                    send_question(from_number, 0)
+                    return jsonify({"status": "ok"}), 200
+
+                # Answer question
                 session = user_sessions[from_number]
                 q_index = session["q_index"]
                 row = df.iloc[q_index]
@@ -190,19 +150,16 @@ def webhook():
 
                 if choice == correct_option:
                     session["score"] += 1
-                    explanation = row[f"Explanation {choice}"] if f"Explanation {choice}" in row and pd.notna(row[f"Explanation {choice}"]) else "कोई विवरण उपलब्ध नहीं।"
-                    send_whatsapp_message(
-                        from_number,
-                        f"✅ सही उत्तर!\n{explanation}"
-                    )
+                    explanation = row.get(f"Explanation {choice}", "कोई विवरण उपलब्ध नहीं।")
+                    send_whatsapp_message(from_number, f"✅ सही उत्तर!\n{explanation}")
                 else:
-                    correct_expl = row[f"Explanation {correct_option}"] if f"Explanation {correct_option}" in row and pd.notna(row[f"Explanation {correct_option}"]) else "कोई विवरण उपलब्ध नहीं।"
+                    correct_expl = row.get(f"Explanation {correct_option}", "कोई विवरण उपलब्ध नहीं।")
                     send_whatsapp_message(
                         from_number,
                         f"❌ गलत उत्तर।\n👉 सही उत्तर: {row[f'Option {correct_option}']}\nℹ️ कारण: {correct_expl}"
                     )
 
-                # Next question or finish
+                # Next question
                 session["q_index"] += 1
                 if session["q_index"] < len(df):
                     send_question(from_number, session["q_index"])
@@ -217,7 +174,6 @@ def webhook():
         print("⚠️ Error processing webhook:", e)
 
     return jsonify({"status": "ok"}), 200
-
 
 # --------------------------
 # Run
