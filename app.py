@@ -127,6 +127,7 @@ def verify():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
+    print("RAW Incoming:", data)
     print("Incoming webhook:", json.dumps(data, indent=2, ensure_ascii=False))
 
     try:
@@ -194,3 +195,4 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
+
