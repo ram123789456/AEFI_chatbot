@@ -85,27 +85,59 @@ def send_question(to, q_index):
         return
 
     row = df.iloc[q_index]
-    # FIX: use safe Series access instead of .get()
-    question_text = row["Question"] if "Question" in row and pd.notna(row["Question"]) else None
-    if not question_text:
-        question_text = row[df.columns[0]]  # fallback: first column
+    # FIX: safe access
+    question_text = row["Question"] if "Question" in row and pd.notna(row["Question"]) else row[df.columns[0]]
+    body_text = f"प्रश्न {q_index+1}: {question_text}"
 
-    body_text = f"प्रश्न {q_index+1}: {question_text}"   
-
-    # Build option buttons
-    buttons = []
+    # Collect options
+    options = []
     for i in range(1, 5):
         col = f"Option {i}"
         if col in row and pd.notna(row[col]):
-            buttons.append({
-                "type": "reply",
-                "reply": {"id": str(i), "title": str(row[col])}
-            })
+            options.append((i, str(row[col])))
 
     print("📤 Question sent:", body_text)
-    print("📤 Options:", [btn["reply"]["title"] for btn in buttons])
-    
-    send_button_message(to, body_text, buttons)
+    print("📤 Options:", [opt[1] for opt in options])
+
+    # Case 1: If <= 3 options → send as buttons
+    if len(options) <= 3:
+        buttons = [
+            {"type": "reply", "reply": {"id": str(i), "title": title[:20]}}
+            for i, title in options
+        ]
+        send_button_message(to, body_text, buttons)
+
+    # Case 2: If > 3 options → send as list (works for 4)
+    else:
+        url = f"https://graph.facebook.com/v17.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
+        headers = {
+            "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "interactive",
+            "interactive": {
+                "type": "list",
+                "body": {"text": body_text},
+                "action": {
+                    "button": "विकल्प चुनें",
+                    "sections": [
+                        {
+                            "title": "उत्तर चुनें",
+                            "rows": [
+                                {"id": str(i), "title": title[:20]}
+                                for i, title in options
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+        print("Send list response:", response.text)
+
 
 # --------------------------
 # Routes
@@ -224,3 +256,4 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
+
