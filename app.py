@@ -90,8 +90,7 @@ def send_question(to, q_index):
         question_text = row[df.columns[0]]  # fallback: first column
 
     body_text = f"प्रश्न {q_index+1}: {question_text}"   
-    print("📤 Question sent:", body_text)
-    print("📤 Options:", [btn["reply"]["title"] for btn in buttons])
+    
 
 
     # Build option buttons
@@ -104,6 +103,9 @@ def send_question(to, q_index):
                 "reply": {"id": str(i), "title": str(row[col])}
             })
 
+    print("📤 Question sent:", body_text)
+    print("📤 Options:", [btn["reply"]["title"] for btn in buttons])
+    
     send_button_message(to, body_text, buttons)
 
 # --------------------------
@@ -222,6 +224,7 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
+
 
 
 
