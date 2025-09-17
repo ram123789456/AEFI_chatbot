@@ -135,14 +135,18 @@ def webhook():
             message = data["entry"][0]["changes"][0]["value"]["messages"][0]
             from_number = message["from"]
 
-            # If first time user → send start prompt
+            # Ensure session exists
             if from_number not in user_sessions:
                 user_sessions[from_number] = {"score": 0, "q_index": None}
-                send_start_prompt(from_number)
-                return jsonify({"status": "ok"}), 200
 
-            # If interactive button reply
-            if "interactive" in message:
+            # Handle text messages
+            if message.get("type") == "text":
+                if user_sessions[from_number]["q_index"] is None:
+                    send_start_prompt(from_number)
+                    return jsonify({"status": "ok"}), 200
+            
+            # Handle interactive replies
+            if message.get("type") == "interactive":
                 button_id = message["interactive"]["button_reply"]["id"]
 
                 # Case 1: User pressed Start
@@ -195,4 +199,5 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
+
 
