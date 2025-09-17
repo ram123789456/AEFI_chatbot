@@ -147,7 +147,17 @@ def webhook():
             
             # Handle interactive replies
             if message.get("type") == "interactive":
-                button_id = message["interactive"]["button_reply"]["id"]
+                interactive_type = message["interactive"].get("type")
+            
+                button_id = None
+                if interactive_type == "button_reply":
+                    button_id = message["interactive"]["button_reply"]["id"]
+                elif interactive_type == "list_reply":
+                    button_id = message["interactive"]["list_reply"]["id"]
+            
+                if not button_id:
+                    print("⚠️ Unknown interactive type:", interactive_type)
+                    return jsonify({"status": "ignored"}), 200
 
                 # Case 1: User pressed Start
                 if button_id == "start_quiz":
@@ -199,5 +209,6 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
+
 
 
