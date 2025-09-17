@@ -85,13 +85,12 @@ def send_question(to, q_index):
         return
 
     row = df.iloc[q_index]
-    question_text = row.get("Question", None)
+    # FIX: use safe Series access instead of .get()
+    question_text = row["Question"] if "Question" in row and pd.notna(row["Question"]) else None
     if not question_text:
         question_text = row[df.columns[0]]  # fallback: first column
 
     body_text = f"प्रश्न {q_index+1}: {question_text}"   
-    
-
 
     # Build option buttons
     buttons = []
@@ -190,12 +189,13 @@ def webhook():
 
                 if choice == correct_option:
                     session["score"] += 1
+                    explanation = row[f"Explanation {choice}"] if f"Explanation {choice}" in row and pd.notna(row[f"Explanation {choice}"]) else "कोई विवरण उपलब्ध नहीं।"
                     send_whatsapp_message(
                         from_number,
-                        f"✅ सही उत्तर!\n{row.get(f'Explanation {choice}', 'कोई विवरण उपलब्ध नहीं।')}"
+                        f"✅ सही उत्तर!\n{explanation}"
                     )
                 else:
-                    correct_expl = row.get(f"Explanation {correct_option}", "कोई विवरण उपलब्ध नहीं।")
+                    correct_expl = row[f"Explanation {correct_option}"] if f"Explanation {correct_option}" in row and pd.notna(row[f"Explanation {correct_option}"]) else "कोई विवरण उपलब्ध नहीं।"
                     send_whatsapp_message(
                         from_number,
                         f"❌ गलत उत्तर।\n👉 सही उत्तर: {row[f'Option {correct_option}']}\nℹ️ कारण: {correct_expl}"
@@ -224,8 +224,3 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
-
-
-
-
-
