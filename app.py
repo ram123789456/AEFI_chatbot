@@ -85,7 +85,14 @@ def send_question(to, q_index):
         return
 
     row = df.iloc[q_index]
-    body_text = f"प्रश्न {q_index+1}: {row['Question']}"
+    question_text = row.get("Question", None)
+    if not question_text:
+        question_text = row[df.columns[0]]  # fallback: first column
+
+    body_text = f"प्रश्न {q_index+1}: {question_text}"   
+    print("📤 Question sent:", body_text)
+    print("📤 Options:", [btn["reply"]["title"] for btn in buttons])
+
 
     # Build option buttons
     buttons = []
@@ -162,8 +169,14 @@ def webhook():
                 # Case 1: User pressed Start
                 if button_id == "start_quiz":
                     user_sessions[from_number]["q_index"] = 0
-                    send_question(from_number, 0)
+                    print("📌 Sending first question...")
+                    print("📌 DataFrame shape:", df.shape)
+                    if df.empty:
+                        send_whatsapp_message(from_number, "⚠️ कोई प्रश्न लोड नहीं हुआ। Excel फ़ाइल देखें।")
+                    else:
+                        send_question(from_number, 0)
                     return jsonify({"status": "ok"}), 200
+
 
                 # Case 2: User answered a question
                 session = user_sessions[from_number]
@@ -209,6 +222,7 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
+
 
 
 
